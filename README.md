@@ -1,1 +1,1 @@
-# bob-ross-project-FA25-Embedded-Systems
+# bob-ross-project-FA25-Embedded-Algorithms
