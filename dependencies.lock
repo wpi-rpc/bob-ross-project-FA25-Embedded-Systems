@@ -21,6 +21,6 @@ dependencies:
 direct_dependencies:
 - espressif/opencv
 - idf
-manifest_hash: 2f601777474b238830506e1b8548b3bccb62d2a765048f6fb74121620aad90ae
+manifest_hash: 0a329bfea5f24c757b2735870d502dbae0a6282ff2d87d6fdffd6193aa33ccba
 target: esp32
 version: 2.0.0
