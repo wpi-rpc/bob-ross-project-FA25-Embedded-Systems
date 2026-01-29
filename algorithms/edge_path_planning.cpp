@@ -37,6 +37,7 @@ std::vector<cv::Point> generate_edge_streak(cv::Mat &image) {
     std::vector<cv::Point> streak = {};
     std::vector<cv::Point> queue = {};
     // Find first white pixel in image
+    bool stop = false;
     for (int i=0; i<image.rows; i++) {
         /* cv::MatIterator_<uchar> iter = std::find(image.row(i).begin<uchar>(), image.row(i).end<uchar>(), 255); // Should ideally work but sadly painfully slow (and leading to UB)
         if (iter!=image.row(i).end<uchar>()) {
@@ -47,9 +48,10 @@ std::vector<cv::Point> generate_edge_streak(cv::Mat &image) {
         for (int j=0; j<image.cols; j++) {
             if (row[j] == 255) {
                 queue.push_back(cv::Point(j,i));
+                stop = true;
                 break;
             }
-        }
+        } if (stop) break;
     }
     while (queue.size()) {
         cv::Point current = queue.front();
@@ -72,33 +74,33 @@ std::vector<cv::Point> generate_edge_streak(cv::Mat &image) {
 }
 
 // # Returns all white pixel neighbours of a given pixel;
-std::vector<cv::Point> get_neighbours(const cv::Point pixel, cv::Mat &image) {
+std::vector<cv::Point> get_neighbours(const cv::Point pixel, const cv::Mat &image) {
     std::vector<cv::Point> neighbours = {};
-    uchar x=pixel.x, y=pixel.y;
+    int x=pixel.x, y=pixel.y;
     // # Neighbours below pixel;
     if (y) {
-        if (image.at<uchar>(y-1,x) == 255) {
+        if (image.at<uchar>(cv::Point(x,y-1)) == 255) {
             neighbours.push_back(cv::Point(x,y-1));
-        } if (x > 0 && image.at<uchar>(y-1,x-1) == 255) {
+        } if (x > 0 && image.at<uchar>(cv::Point(x-1,y-1)) == 255) {
             neighbours.push_back(cv::Point(x-1,y-1));
-        } if (x < image.cols-1 && image.at<uchar>(y-1,x+1) == 255) {
+        } if (x < image.cols-1 && image.at<uchar>(cv::Point(x+1,y-1)) == 255) {
             neighbours.push_back(cv::Point(x+1,y-1));
         }
     }
     // # neighbours above pixel;
     if (y < image.rows-1) {
-        if (image.at<uchar>(y+1,x) == 255) {
+        if (image.at<uchar>(cv::Point(x,y+1)) == 255) {
             neighbours.push_back(cv::Point(x,y+1));
-        } if (x > 0 and image.at<uchar>(y+1,x-1) == 255) {
+        } if (x > 0 && image.at<uchar>(cv::Point(x-1,y+1)) == 255) {
             neighbours.push_back(cv::Point(x-1,y+1));
-        } if (x < image.cols-1 && image.at<uchar>(y+1,x+1) == 255) {
+        } if (x < image.cols-1 && image.at<uchar>(cv::Point(x+1,y+1)) == 255) {
             neighbours.push_back(cv::Point(x+1,y+1));
         }
     }
     // # neighbours left and right of pixel;
-    if (x > 0 and image.at<uchar>(y,x-1) == 255) {
+    if (x > 0 && image.at<uchar>(cv::Point(x-1,y)) == 255) {
         neighbours.push_back(cv::Point(x-1,y));
-    } if (x < image.cols-1 && image.at<uchar>(y,x+1) == 255) {
+    } if (x < image.cols-1 && image.at<uchar>(cv::Point(x+1,y)) == 255) {
         neighbours.push_back(cv::Point(x+1,y));
     }
 
