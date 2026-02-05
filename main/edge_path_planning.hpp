@@ -2,7 +2,6 @@
 #define EDGE_PATH_PLANNING_HPP
 
 #include <vector>
-#include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 
 std::vector<std::vector<cv::Point>> interpolate(const std::vector<std::vector<cv::Point>> &path);

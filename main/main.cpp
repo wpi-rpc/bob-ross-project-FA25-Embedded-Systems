@@ -2,6 +2,8 @@
 #include <vector>
 #include <string>
 #include <cstring>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_netif.h"
@@ -9,6 +11,7 @@
 #include "esp_wifi.h"
 #include "esp_http_server.h"
 #include "esp_sleep.h"
+#include "edge_path_planning.hpp"
 
 #define WIFI_SSID "" // Replace with hostname of hotspot/router/service
 #define WIFI_PASS "" // Replace with password of hotspot/router/service
@@ -22,28 +25,73 @@ static std::vector<uint8_t> uploaded_image;
 // Simple HTML page
 const char* index_html = R"rawliteral(
 <!DOCTYPE html>
-<html>
-<head>
-  <title>ESP32 Image Upload</title>
-</head>
-<body>
-  <h1>Upload an Image</h1>
-  <form method="POST" action="/upload" enctype="multipart/form-data">
-    <input type="file" name="image">
-    <input type="submit" value="Upload">
-  </form>
-  <img id="uploaded" src="" style="max-width:300px;">
-  <script>
-    const form = document.querySelector('form');
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      const data = new FormData(form);
-      fetch('/upload', { method:'POST', body:data }).then(() => {
-        document.getElementById('uploaded').src = '/image?' + new Date().getTime();
-      });
-    });
-  </script>
-</body>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>ESP32 Image Upload</title>
+        <style>
+            img {
+                max-width: 320px;
+                margin-top: 1rem;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Upload an Image</h1>
+        <input type="file" id="upload" accept="image/*"><br>
+        <img id="uploaded" hidden>
+
+        <script>
+            const input = document.getElementById('upload');
+            const img = document.getElementById('uploaded');
+
+            input.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const original = new Image();
+                    original.onload = () => {
+                        const MAX_DIM = Math.max(original.width, original.height);
+                        var SCALE_FACTOR;
+                        if (MAX_DIM > 640) {
+                            SCALE_FACTOR = 640 / MAX_DIM;
+                        } else SCALE_FACTOR = 1;
+                        const NEW_WIDTH = original.width*SCALE_FACTOR;
+                        const NEW_HEIGHT = original.height*SCALE_FACTOR;
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = NEW_WIDTH;
+                        canvas.height = NEW_HEIGHT;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(original, 0, 0, NEW_WIDTH, NEW_HEIGHT);
+
+                        // Show preview
+                        img.hidden = false;
+                        img.src = canvas.toDataURL('image/jpeg');
+
+                        // POST to ESP
+                        canvas.toBlob((blob) => {
+                            if (!blob) {
+                                console.error('ERROR: Failed to POST from client');
+                                return;
+                            }
+
+                            const data = new FormData();
+                            data.append('file', blob, 'image.jpeg');
+
+                            fetch('/upload', { method: 'POST', body: data }).then(() => {
+                                console.log('LOG: HTTP method of type POST requested');
+                            }).catch(console.error);
+                        }, 'image/jpeg');
+                    };
+                    original.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        </script>
+    </body>
 </html>
 )rawliteral";
 
