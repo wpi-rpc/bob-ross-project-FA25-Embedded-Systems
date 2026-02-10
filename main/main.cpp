@@ -11,6 +11,7 @@
 #include "esp_wifi.h"
 #include "esp_http_server.h"
 #include "esp_sleep.h"
+#include "mdns.h"
 #include "edge_path_planning.hpp"
 
 #define WIFI_SSID "" // Replace with hostname of hotspot/router/service
@@ -21,6 +22,11 @@ static httpd_handle_t server = nullptr;
 
 // Store uploaded image in RAM
 static std::vector<uint8_t> uploaded_image;
+static uint8_t buffer[255*255];
+cv::Mat viewN(255,255,CV_8UC1,buffer); // NxN-dimensional view of buffer
+
+// Declarations
+static char *generate_hostname(void); // https://components.espressif.com/components/espressif/mdns/versions/1.3.2/examples/query_advertise
 
 // Simple HTML page
 const char* index_html = R"rawliteral(
@@ -66,6 +72,17 @@ const char* index_html = R"rawliteral(
                         canvas.height = NEW_HEIGHT;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(original, 0, 0, NEW_WIDTH, NEW_HEIGHT);
+
+                        const dataRGBA = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                        buffer = new Uint8ClampedArray(dataRGBA.length);
+                        for (i=0; i<buffer.length; i++) {
+                            buffer[4*i]=(19595 * dataRGBA[4*i] + 38470 * dataRGBA[4*i+1] + 7471 * dataRGBA[4*i+2] + 32768) >> 16;
+                            buffer[4*i+1]=buffer[4*i];
+                            buffer[4*i+2]=buffer[4*i];
+                            buffer[4*i+3]=255;
+                        }
+                        const new_data = new ImageData(buffer,canvas.width,canvas.height);
+                        ctx.putImageData(new_data,0,0);
 
                         // Show preview
                         img.hidden = false;
@@ -193,13 +210,40 @@ void wifi_init() {
     ESP_LOGI(TAG, "LOG: Connecting to WiFi %s...", WIFI_SSID);
 }
 
+void start_mdns_service() {
+    // Initialize mDNS
+    mdns_init();
+    // Set hostname
+    char* hostname = generate_hostname();
+    mdns_hostname_set(hostname); // Sets the hostname to the generated hostname
+    // Set default instance name
+    mdns_instance_name_set("ESP32 Web Server");
+    mdns_service_add(nullptr, "_http", "_tcp", 80, nullptr, 0);
+}
+
 extern "C" void app_main() {
     if (!strlen(WIFI_SSID)) {
-      ESP_LOGI(TAG, "ERROR: WiFi credentials not set! Halting...");
-      esp_deep_sleep_start();
+        ESP_LOGI(TAG, "ERROR: WiFi credentials not set! Halting...");
+        esp_deep_sleep_start();
     } else {
-      nvs_flash_init();
-      wifi_init();
-      server = start_webserver();
+        nvs_flash_init();
+        wifi_init();
+        // vTaskDelay(pdMS_TO_TICKS(1500));
+        start_mdns_service();
+        server = start_webserver();
     }
+}
+
+static char* generate_hostname(void) {
+    #ifndef CONFIG_MDNS_ADD_MAC_TO_HOSTNAME
+        return strdup(CONFIG_MDNS_HOSTNAME);
+    #else
+        uint8_t mac[6];
+        char* hostname;
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        if (-1 == asprintf(&hostname, "%s-%02X%02X%02X", CONFIG_MDNS_HOSTNAME, mac[3], mac[4], mac[5])) {
+            abort();
+        }
+        return hostname;
+    #endif
 }

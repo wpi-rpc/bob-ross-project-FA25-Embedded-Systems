@@ -1,4 +1,14 @@
 dependencies:
+  espressif/mdns:
+    component_hash: 29e47564b1a7ee778135e17fbbf2a2773f71c97ebabfe626c8eda7c958a7ad16
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.9.1
   espressif/opencv:
     component_hash: 9a5e4f3453048ab05419bbef0e5ab67cc98be5e0d51d8a194f41c167c63921d5
     dependencies:
@@ -29,9 +39,10 @@ dependencies:
       type: idf
     version: 5.5.2
 direct_dependencies:
+- espressif/mdns
 - espressif/opencv
 - espressif/zlib
 - idf
-manifest_hash: 05bc2496873707fca7fc44bc1ee3c29388576275877ec4eb360ac8d8f0dbce49
+manifest_hash: d41a1ad9cbb83010e7481c207402b1446b8333842ab9a3f3bc635995548d3e7a
 target: esp32
 version: 2.0.0
