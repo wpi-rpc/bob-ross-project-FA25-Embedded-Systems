@@ -7,10 +7,12 @@
 │   └── Dockerfile
 ├── main/
 │   ├── CMakeLists.txt
+│   ├── Kconfig.projbuild
 │   ├── edge_path_planning.cpp
 │   ├── edge_path_planning.hpp
+│   ├── favicon.ico
 │   ├── idf_component.yml
-│   ├── Kconfig.projbuild
+│   ├── index.html
 │   └── main.cpp
 ├── .clangd
 ├── .gitignore

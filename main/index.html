@@ -1,0 +1,81 @@
+<!-- Undesirable if priority entails using macros -->
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>ESP32 Image Upload</title>
+        <style>
+            img {
+                max-width: 320px;
+                margin-top: 1rem;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Upload an Image</h1>
+        <input type="file" id="upload" accept="image/*"><br>
+        <img id="uploaded" hidden>
+
+        <script>
+            const input = document.getElementById('upload');
+            const img = document.getElementById('uploaded');
+
+            input.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const original = new Image();
+                    original.onload = async () => {
+                        const MAX_DIM = Math.max(original.width, original.height);
+                        var SCALE_FACTOR;
+                        if (MAX_DIM > 640) {
+                            SCALE_FACTOR = 640 / MAX_DIM;
+                        } else SCALE_FACTOR = 1;
+                        const NEW_WIDTH = original.width*SCALE_FACTOR;
+                        const NEW_HEIGHT = original.height*SCALE_FACTOR;
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = NEW_WIDTH;
+                        canvas.height = NEW_HEIGHT;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(original, 0, 0, NEW_WIDTH, NEW_HEIGHT);
+
+                        const dataRGBA = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                        buffer = new Uint8ClampedArray(dataRGBA.length);
+                        for (i=0; i<buffer.length; i++) {
+                            buffer[4*i]=(19595 * dataRGBA[4*i] + 38470 * dataRGBA[4*i+1] + 7471 * dataRGBA[4*i+2] + 32768) >> 16;
+                            buffer[4*i+1]=buffer[4*i];
+                            buffer[4*i+2]=buffer[4*i];
+                            buffer[4*i+3]=255;
+                        }
+                        const new_data = new ImageData(buffer,canvas.width,canvas.height);
+                        ctx.putImageData(new_data,0,0);
+
+                        // Show preview
+                        img.hidden = false;
+                        img.src = canvas.toDataURL('image/jpeg');
+
+                        // POST to ESP
+                        canvas.toBlob((blob) => {
+                            if (!blob) {
+                                console.error('ERROR: Failed to POST from client');
+                                return;
+                            }
+
+                            const data = new FormData();
+                            data.append('file', blob, 'image.jpeg');
+
+                            fetch('/upload', { method: 'POST', body: data }).then(() => {
+                                console.log('LOG: HTTP method of type POST requested');
+                            }).catch(console.error);
+                        }, 'image/jpeg');
+                    };
+                    original.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        </script>
+    </body>
+</html>

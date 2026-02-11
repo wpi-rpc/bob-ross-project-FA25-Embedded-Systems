@@ -28,94 +28,22 @@ cv::Mat viewN(255,255,CV_8UC1,buffer); // NxN-dimensional view of buffer
 // Declarations
 static char *generate_hostname(void); // https://components.espressif.com/components/espressif/mdns/versions/1.3.2/examples/query_advertise
 
-// Simple HTML page
-const char* index_html = R"rawliteral(
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>ESP32 Image Upload</title>
-        <style>
-            img {
-                max-width: 320px;
-                margin-top: 1rem;
-            }
-        </style>
-    </head>
-    <body>
-        <h1>Upload an Image</h1>
-        <input type="file" id="upload" accept="image/*"><br>
-        <img id="uploaded" hidden>
-
-        <script>
-            const input = document.getElementById('upload');
-            const img = document.getElementById('uploaded');
-
-            input.addEventListener('change', (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const original = new Image();
-                    original.onload = () => {
-                        const MAX_DIM = Math.max(original.width, original.height);
-                        var SCALE_FACTOR;
-                        if (MAX_DIM > 640) {
-                            SCALE_FACTOR = 640 / MAX_DIM;
-                        } else SCALE_FACTOR = 1;
-                        const NEW_WIDTH = original.width*SCALE_FACTOR;
-                        const NEW_HEIGHT = original.height*SCALE_FACTOR;
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width = NEW_WIDTH;
-                        canvas.height = NEW_HEIGHT;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(original, 0, 0, NEW_WIDTH, NEW_HEIGHT);
-
-                        const dataRGBA = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-                        buffer = new Uint8ClampedArray(dataRGBA.length);
-                        for (i=0; i<buffer.length; i++) {
-                            buffer[4*i]=(19595 * dataRGBA[4*i] + 38470 * dataRGBA[4*i+1] + 7471 * dataRGBA[4*i+2] + 32768) >> 16;
-                            buffer[4*i+1]=buffer[4*i];
-                            buffer[4*i+2]=buffer[4*i];
-                            buffer[4*i+3]=255;
-                        }
-                        const new_data = new ImageData(buffer,canvas.width,canvas.height);
-                        ctx.putImageData(new_data,0,0);
-
-                        // Show preview
-                        img.hidden = false;
-                        img.src = canvas.toDataURL('image/jpeg');
-
-                        // POST to ESP
-                        canvas.toBlob((blob) => {
-                            if (!blob) {
-                                console.error('ERROR: Failed to POST from client');
-                                return;
-                            }
-
-                            const data = new FormData();
-                            data.append('file', blob, 'image.jpeg');
-
-                            fetch('/upload', { method: 'POST', body: data }).then(() => {
-                                console.log('LOG: HTTP method of type POST requested');
-                            }).catch(console.error);
-                        }, 'image/jpeg');
-                    };
-                    original.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            });
-        </script>
-    </body>
-</html>
-)rawliteral";
-
 // Root page
 esp_err_t index_get_handler(httpd_req_t* req) {
+    extern const unsigned char index_html_start[] asm("_binary_index_html_start");
+    extern const unsigned char index_html_end[] asm("_binary_index_html_end");
+
     httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, index_html, strlen(index_html));
+    return httpd_resp_send(req, (const char*)index_html_start, index_html_end - index_html_start);
+}
+
+// Favicon
+esp_err_t favicon_get_handler(httpd_req_t* req) { // https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/protocols/esp_http_server.html#file-serving
+    extern const unsigned char favicon_ico_start[] asm("_binary_favicon_ico_start");
+    extern const unsigned char favicon_ico_end[] asm("_binary_favicon_ico_end");
+
+    httpd_resp_set_type(req, "image/x-icon");
+    return httpd_resp_send(req, (const char*)favicon_ico_start, favicon_ico_end - favicon_ico_start);
 }
 
 // Upload handler
@@ -187,6 +115,9 @@ httpd_handle_t start_webserver() {
 
         httpd_uri_t image_uri = { "/image", HTTP_GET, image_get_handler, nullptr };
         httpd_register_uri_handler(server, &image_uri);
+
+        httpd_uri_t favicon_uri = { "/favicon.ico", HTTP_GET, favicon_get_handler, nullptr };
+        httpd_register_uri_handler(server, &favicon_uri);
     }
     return server;
 }
