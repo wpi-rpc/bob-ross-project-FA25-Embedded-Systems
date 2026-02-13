@@ -21,9 +21,7 @@ static const char* TAG = "webserver";
 static httpd_handle_t server = nullptr;
 
 // Store uploaded image in RAM
-static std::vector<uint8_t> uploaded_image;
-static uint8_t buffer[255*255];
-cv::Mat viewN(255,255,CV_8UC1,buffer); // NxN-dimensional view of buffer
+static char image_buffer[127*127];
 
 // Declarations
 static char *generate_hostname(void); // https://components.espressif.com/components/espressif/mdns/versions/1.3.2/examples/query_advertise
@@ -48,73 +46,44 @@ esp_err_t favicon_get_handler(httpd_req_t* req) { // https://docs.espressif.com/
 
 // Upload handler
 esp_err_t upload_post_handler(httpd_req_t* req) {
-    uploaded_image.clear();
-
-    char buf[1024];
-    int remaining = req->content_len;
+    char width_buffer[4];
+    char height_buffer[4];
 
     // Read all bytes from POST
-    std::vector<uint8_t> raw_data;
-    while (remaining > 0) {
-        int to_read = std::min(remaining, (int)sizeof(buf));
-        int ret = httpd_req_recv(req, buf, to_read);
-        if (ret <= 0) break;
-        raw_data.insert(raw_data.end(), buf, buf + ret);
-        remaining -= ret;
-    }
+    httpd_req_recv(req, width_buffer, 4);
+    httpd_req_recv(req, height_buffer, 4);
+    int width = *(int*)width_buffer; // Width "N"
+    int height = *(int*)height_buffer; // Height "M"
 
-    // Find the start of the file data
-    const std::string data(raw_data.begin(), raw_data.end());
-    size_t pos = data.find("\r\n\r\n"); // end of headers
-    if (pos != std::string::npos) {
-        pos += 4; // skip the "\r\n\r\n"
-        size_t end = data.rfind("--"); // rough end of multipart
-        if (end != std::string::npos && end > pos) {
-            uploaded_image.assign(raw_data.begin() + pos, raw_data.begin() + end - 2); // strip final \r\n
-        } else {
-            uploaded_image.assign(raw_data.begin() + pos, raw_data.end());
-        }
-    }
+    httpd_req_recv(req, image_buffer, width*height);
+    cv::Mat viewMN(height,width,CV_8UC1,image_buffer); // MxN-dimensional view of buffer
+    cv::Canny(viewMN,viewMN,100,250);
+    std::vector<std::vector<cv::Point>> edge_path = edge_path_coordinates(viewMN); // Process the image in-place
+    cv::String coord_buffer = "[\n";
+    for (int i=0; i<edge_path.size(); i++) {
+        coord_buffer+="\t[";
+        for (int j=0; j<edge_path[i].size(); j++) {
+            coord_buffer+="("+std::to_string(edge_path[i][j].x)+","+std::to_string(edge_path[i][j].y)+"), ";
+        } coord_buffer+="],\n";
+    } coord_buffer+="]\n";
+    ESP_LOGI(TAG, "LOG: Edge path coordinates at %s", coord_buffer.c_str());
 
-    ESP_LOGI(TAG, "LOG: Uploaded %d bytes", uploaded_image.size());
     return httpd_resp_send(req, "OK", 2);
-}
-
-// Serve image in chunks
-esp_err_t image_get_handler(httpd_req_t* req) {
-    if (uploaded_image.empty()) {
-        return httpd_resp_send_404(req);
-    }
-
-    httpd_resp_set_type(req, "image/jpeg");
-    size_t chunk_size = 1024;
-    size_t sent = 0;
-    while (sent < uploaded_image.size()) {
-        size_t to_send = std::min(chunk_size, uploaded_image.size() - sent);
-        esp_err_t ret = httpd_resp_send_chunk(req,
-            reinterpret_cast<const char*>(uploaded_image.data() + sent), to_send);
-        if (ret != ESP_OK) break;
-        sent += to_send;
-    }
-    return httpd_resp_send_chunk(req, nullptr, 0); // end of chunks
 }
 
 // Start webserver
 httpd_handle_t start_webserver() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.stack_size = 8192;
+    config.stack_size = 16384; // Increase stack size to prevent overflow with OpenCV processing
     config.recv_wait_timeout = 10;
 
     httpd_handle_t server = nullptr;
     if (httpd_start(&server, &config) == ESP_OK) {
         httpd_uri_t index_uri = { "/", HTTP_GET, index_get_handler, nullptr };
         httpd_register_uri_handler(server, &index_uri);
-
+        
         httpd_uri_t upload_uri = { "/upload", HTTP_POST, upload_post_handler, nullptr };
         httpd_register_uri_handler(server, &upload_uri);
-
-        httpd_uri_t image_uri = { "/image", HTTP_GET, image_get_handler, nullptr };
-        httpd_register_uri_handler(server, &image_uri);
 
         httpd_uri_t favicon_uri = { "/favicon.ico", HTTP_GET, favicon_get_handler, nullptr };
         httpd_register_uri_handler(server, &favicon_uri);
