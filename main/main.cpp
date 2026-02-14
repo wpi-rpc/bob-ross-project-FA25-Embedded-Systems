@@ -1,5 +1,4 @@
 // GENERATED WITH HELP FROM GPT-5 MINI; WILL REFACTOR WHEN CONVENIENT
-#include <vector>
 #include <string>
 #include <cstring>
 #include <opencv2/imgproc.hpp>
@@ -48,17 +47,23 @@ esp_err_t favicon_get_handler(httpd_req_t* req) { // https://docs.espressif.com/
 esp_err_t upload_post_handler(httpd_req_t* req) {
     char width_buffer[4];
     char height_buffer[4];
+    char width_offset_buffer[4];
+    char height_offset_buffer[4];
 
     // Read all bytes from POST
     httpd_req_recv(req, width_buffer, 4);
     httpd_req_recv(req, height_buffer, 4);
+    httpd_req_recv(req, width_offset_buffer, 4);
+    httpd_req_recv(req, height_offset_buffer, 4);
     int width = *(int*)width_buffer; // Width "N"
     int height = *(int*)height_buffer; // Height "M"
+    int width_offset = *(int*)width_offset_buffer;
+    int height_offset = *(int*)height_offset_buffer;
 
     httpd_req_recv(req, image_buffer, width*height);
     cv::Mat viewMN(height,width,CV_8UC1,image_buffer); // MxN-dimensional view of buffer
     cv::Canny(viewMN,viewMN,100,250);
-    std::vector<std::vector<cv::Point>> edge_path = edge_path_coordinates(viewMN); // Process the image in-place
+    std::vector<std::vector<cv::Point>> edge_path = edge_path_coordinates(viewMN, cv::Point(width_offset,height_offset)); // Process the image in-place
     cv::String coord_buffer = "[\n";
     for (int i=0; i<edge_path.size(); i++) {
         coord_buffer+="\t[";
@@ -66,7 +71,7 @@ esp_err_t upload_post_handler(httpd_req_t* req) {
             coord_buffer+="("+std::to_string(edge_path[i][j].x)+","+std::to_string(edge_path[i][j].y)+"), ";
         } coord_buffer+="],\n";
     } coord_buffer+="]\n";
-    ESP_LOGI(TAG, "LOG: Edge path coordinates at %s", coord_buffer.c_str());
+    ESP_LOGI(TAG, "Edge path coordinates at %s", coord_buffer.c_str());
 
     return httpd_resp_send(req, "OK", 2);
 }
@@ -107,10 +112,10 @@ void wifi_init() {
 
     esp_wifi_start();
     esp_wifi_connect();
-    ESP_LOGI(TAG, "LOG: Connecting to WiFi %s...", WIFI_SSID);
+    ESP_LOGI(TAG, "Connecting to WiFi %s...", WIFI_SSID);
 }
 
-void start_mdns_service() {
+void start_mdns_service() { // Resolves IP to mDNS hostname and starts mDNS service
     // Initialize mDNS
     mdns_init();
     // Set hostname
@@ -123,7 +128,7 @@ void start_mdns_service() {
 
 extern "C" void app_main() {
     if (!strlen(WIFI_SSID)) {
-        ESP_LOGI(TAG, "ERROR: WiFi credentials not set! Halting...");
+        ESP_LOGE(TAG, "WiFi credentials not set! Halting...");
         esp_deep_sleep_start();
     } else {
         nvs_flash_init();

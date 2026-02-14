@@ -13,10 +13,34 @@
     </head>
     <body>
         <h1>Upload an Image</h1>
+        Resolution: <input id="resolution" oninput="this.value=this.value.replace(/[^0-9]/g,'')+'px'"><input id="submit" type="button" onclick="set_resolution()" value="Submit"> <!-- Element `type` is "button" because document does not yet handle behaviour on submit -->
+        <br>
         <input type="file" id="upload" accept="image/*"><br>
         <img id="uploaded" hidden>
 
         <script>
+            threshold = 640; // Default maximum resolution; may be changed by user at runtime
+            const resolution_input = document.getElementById('resolution');
+            resolution_input.value = threshold+'px';
+            function set_resolution() {
+                const resolution = document.getElementById('resolution').value.slice(0,-2);
+                if (resolution==threshold) {
+                    console.log(`LOG: Resolution not updated; already set to ${threshold}px`);
+                } else if (Number(resolution)>=1) {
+                    threshold = Number(resolution);
+                    console.log(`LOG: Resolution set to ${threshold}px`);
+                    resolution_input.value = threshold+'px';
+                } else {
+                    console.error('LOG: Resolution not updated; must be at least 1px');
+                }
+            }
+            resolution_input.addEventListener('input', (e) => {
+                position = resolution_input.value.length-2;
+                if (resolution_input.selectionStart > position) {
+                    resolution_input.setSelectionRange(position, position);
+                }
+            });
+
             const input = document.getElementById('upload');
             const img = document.getElementById('uploaded');
 
@@ -31,8 +55,8 @@
                         const MAX_DIM = Math.max(original.width, original.height);
                         const SUBIMAGE_DIM = 64;
                         var SCALE_FACTOR = 1;
-                        if (MAX_DIM > 640) {
-                            SCALE_FACTOR = 640 / MAX_DIM;
+                        if (MAX_DIM > threshold) {
+                            SCALE_FACTOR = threshold/MAX_DIM;
                         }
                         const NEW_WIDTH = original.width*SCALE_FACTOR;
                         const NEW_HEIGHT = original.height*SCALE_FACTOR;
@@ -47,17 +71,19 @@
                         imageBGW = new Uint8ClampedArray(dataRGBA.length);
                         for (l=0;l<(canvas.height/SUBIMAGE_DIM-1^0);l++) {
                             for (p=0;p<(canvas.width/SUBIMAGE_DIM-1^0);p++) {
-                                subimage = new Uint8ClampedArray(2*4+SUBIMAGE_DIM*SUBIMAGE_DIM);
+                                subimage = new Uint8ClampedArray(4*4+SUBIMAGE_DIM*SUBIMAGE_DIM);
                                 subimage_view = new DataView(subimage.buffer);
                                 subimage_view.setUint32(0,SUBIMAGE_DIM,true);
                                 subimage_view.setUint32(4,SUBIMAGE_DIM,true);
+                                subimage_view.setUint32(8,SUBIMAGE_DIM*p,true);
+                                subimage_view.setUint32(12,l*SUBIMAGE_DIM,true);
                                 for (i=0; i<SUBIMAGE_DIM; i++) {
                                     for (j=0; j<SUBIMAGE_DIM; j++) {
                                         idx = canvas.width*(i+l*SUBIMAGE_DIM)+j+SUBIMAGE_DIM*p;
                                         
-                                        subimage[2*4+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
+                                        subimage[4*4+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
                                         
-                                        imageBGW[4*idx]=subimage[2*4+SUBIMAGE_DIM*i+j];
+                                        imageBGW[4*idx]=subimage[4*4+SUBIMAGE_DIM*i+j];
                                         imageBGW[4*idx+1]=imageBGW[4*idx];
                                         imageBGW[4*idx+2]=imageBGW[4*idx];
                                         imageBGW[4*idx+3]=255;
@@ -76,17 +102,19 @@
                         }
                         
                         for (l=0;l<(canvas.height/SUBIMAGE_DIM-1^0);l++) {
-                            subimage = new Uint8ClampedArray(2*4+SUBIMAGE_DIM*(canvas.width-SUBIMAGE_DIM*p));
+                            subimage = new Uint8ClampedArray(4*4+SUBIMAGE_DIM*(canvas.width-SUBIMAGE_DIM*p));
                             subimage_view = new DataView(subimage.buffer);
                             subimage_view.setUint32(0,canvas.width-SUBIMAGE_DIM*p,true);
                             subimage_view.setUint32(4,SUBIMAGE_DIM,true);
+                            subimage_view.setUint32(8,SUBIMAGE_DIM*p,true);
+                            subimage_view.setUint32(12,l*SUBIMAGE_DIM,true);
                             for (i=0; i<SUBIMAGE_DIM; i++) {
                                 for (j=0; j<canvas.width-SUBIMAGE_DIM*p; j++) {
                                     idx = canvas.width*(i+l*SUBIMAGE_DIM)+j+SUBIMAGE_DIM*p;
                                     
-                                    subimage[2*4+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
+                                    subimage[4*4+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
                                     
-                                    imageBGW[4*idx]=subimage[2*4+SUBIMAGE_DIM*i+j];
+                                    imageBGW[4*idx]=subimage[4*4+SUBIMAGE_DIM*i+j];
                                     imageBGW[4*idx+1]=imageBGW[4*idx];
                                     imageBGW[4*idx+2]=imageBGW[4*idx];
                                     imageBGW[4*idx+3]=255;
@@ -104,17 +132,19 @@
                         }
 
                         for (p=0;p<(canvas.width/SUBIMAGE_DIM-1^0);p++) {
-                            subimage = new Uint8ClampedArray(2*4+(canvas.height-l*SUBIMAGE_DIM)*SUBIMAGE_DIM);
+                            subimage = new Uint8ClampedArray(4*4+(canvas.height-l*SUBIMAGE_DIM)*SUBIMAGE_DIM);
                             subimage_view = new DataView(subimage.buffer);
                             subimage_view.setUint32(0,SUBIMAGE_DIM,true);
                             subimage_view.setUint32(4,canvas.height-l*SUBIMAGE_DIM,true);
+                            subimage_view.setUint32(8,SUBIMAGE_DIM*p,true);
+                            subimage_view.setUint32(12,l*SUBIMAGE_DIM,true);
                             for (i=0; i<canvas.height-l*SUBIMAGE_DIM; i++) {
                                 for (j=0; j<SUBIMAGE_DIM; j++) {
                                     idx = canvas.width*(i+l*SUBIMAGE_DIM)+j+SUBIMAGE_DIM*p;
                                     
-                                    subimage[2*4+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
+                                    subimage[4*4+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
                                     
-                                    imageBGW[4*idx]=subimage[2*4+SUBIMAGE_DIM*i+j];
+                                    imageBGW[4*idx]=subimage[4*4+SUBIMAGE_DIM*i+j];
                                     imageBGW[4*idx+1]=imageBGW[4*idx];
                                     imageBGW[4*idx+2]=imageBGW[4*idx];
                                     imageBGW[4*idx+3]=255;
@@ -131,17 +161,19 @@
                             img.src = canvas.toDataURL('image/jpeg');
                         }
 
-                        subimage = new Uint8ClampedArray(2*4+(canvas.height-l*SUBIMAGE_DIM)*(canvas.width-SUBIMAGE_DIM*p));
+                        subimage = new Uint8ClampedArray(4*4+(canvas.height-l*SUBIMAGE_DIM)*(canvas.width-SUBIMAGE_DIM*p));
                         subimage_view = new DataView(subimage.buffer);
                         subimage_view.setUint32(0,canvas.width-SUBIMAGE_DIM*p,true);
                         subimage_view.setUint32(4,canvas.height-l*SUBIMAGE_DIM,true);
+                        subimage_view.setUint32(8,SUBIMAGE_DIM*p,true);
+                        subimage_view.setUint32(12,l*SUBIMAGE_DIM,true);
                         for (i=0; i<canvas.height-l*SUBIMAGE_DIM; i++) {
                             for (j=0; j<canvas.width-SUBIMAGE_DIM*p; j++) {
                                 idx = canvas.width*(i+l*SUBIMAGE_DIM)+j+SUBIMAGE_DIM*p;
                                 
-                                subimage[2*4+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
+                                subimage[4*4+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
                                 
-                                imageBGW[4*idx]=subimage[2*4+SUBIMAGE_DIM*i+j];
+                                imageBGW[4*idx]=subimage[4*4+SUBIMAGE_DIM*i+j];
                                 imageBGW[4*idx+1]=imageBGW[4*idx];
                                 imageBGW[4*idx+2]=imageBGW[4*idx];
                                 imageBGW[4*idx+3]=255;
