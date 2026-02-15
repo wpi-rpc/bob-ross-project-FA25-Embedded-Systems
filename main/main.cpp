@@ -11,6 +11,7 @@
 #include "esp_http_server.h"
 #include "esp_sleep.h"
 #include "mdns.h"
+#include "driver/uart.h"
 #include "edge_path_planning.hpp"
 
 #define WIFI_SSID "" // Replace with hostname of hotspot/router/service
@@ -24,6 +25,24 @@ static char image_buffer[127*127];
 
 // Declarations
 static char *generate_hostname(void); // https://components.espressif.com/components/espressif/mdns/versions/1.3.2/examples/query_advertise
+
+struct command {
+    unsigned short x,y;
+    char z:2;
+    char colour:3;
+};
+
+const int uart_buffer_size = 1024*2; // https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/uart.html
+
+const uart_port_t uart_num = UART_NUM_2; // Default GPIO17 (U2_TXD) and GPIO16 (U2_RXD)
+uart_config_t uart_config = {
+    .baud_rate = 115200,
+    .data_bits = UART_DATA_8_BITS,
+    .parity = UART_PARITY_DISABLE,
+    .stop_bits = UART_STOP_BITS_1,
+    .flow_ctrl = UART_HW_FLOWCTRL_CTS_RTS,
+    .rx_flow_ctrl_thresh = 122,
+};
 
 // Root page
 esp_err_t index_get_handler(httpd_req_t* req) {
@@ -45,33 +64,38 @@ esp_err_t favicon_get_handler(httpd_req_t* req) { // https://docs.espressif.com/
 
 // Upload handler
 esp_err_t upload_post_handler(httpd_req_t* req) {
-    char width_buffer[4];
-    char height_buffer[4];
-    char width_offset_buffer[4];
-    char height_offset_buffer[4];
+    char width_buffer[2];
+    char height_buffer[2];
+    char width_offset_buffer[2];
+    char height_offset_buffer[2];
 
     // Read all bytes from POST
-    httpd_req_recv(req, width_buffer, 4);
-    httpd_req_recv(req, height_buffer, 4);
-    httpd_req_recv(req, width_offset_buffer, 4);
-    httpd_req_recv(req, height_offset_buffer, 4);
-    int width = *(int*)width_buffer; // Width "N"
-    int height = *(int*)height_buffer; // Height "M"
-    int width_offset = *(int*)width_offset_buffer;
-    int height_offset = *(int*)height_offset_buffer;
+    httpd_req_recv(req, width_buffer, 2);
+    httpd_req_recv(req, height_buffer, 2);
+    httpd_req_recv(req, width_offset_buffer, 2);
+    httpd_req_recv(req, height_offset_buffer, 2);
+    unsigned short width = *(unsigned short*)width_buffer; // Width "N"
+    unsigned short height = *(unsigned short*)height_buffer; // Height "M"
+    unsigned short width_offset = *(unsigned short*)width_offset_buffer;
+    unsigned short height_offset = *(unsigned short*)height_offset_buffer;
 
     httpd_req_recv(req, image_buffer, width*height);
     cv::Mat viewMN(height,width,CV_8UC1,image_buffer); // MxN-dimensional view of buffer
     cv::Canny(viewMN,viewMN,100,250);
-    std::vector<std::vector<cv::Point>> edge_path = edge_path_coordinates(viewMN, cv::Point(width_offset,height_offset)); // Process the image in-place
-    cv::String coord_buffer = "[\n";
+    Path edge_path = edge_path_coordinates(viewMN, cv::Point(width_offset,height_offset)); // Process the image in-place
+    command uart_out;
     for (int i=0; i<edge_path.size(); i++) {
-        coord_buffer+="\t[";
         for (int j=0; j<edge_path[i].size(); j++) {
-            coord_buffer+="("+std::to_string(edge_path[i][j].x)+","+std::to_string(edge_path[i][j].y)+"), ";
-        } coord_buffer+="],\n";
-    } coord_buffer+="]\n";
-    ESP_LOGI(TAG, "Edge path coordinates at %s", coord_buffer.c_str());
+            uart_out.x = edge_path[i][j].x;
+            uart_out.y = edge_path[i][j].y;
+            uart_out.z = 2;
+            if (!j) uart_out.z = 1;
+            if (j==edge_path[i].size()-1) uart_out.z = 0;
+            uart_out.colour = 0;
+            uart_write_bytes(uart_num, (const char*)&uart_out, sizeof(uart_out));
+            ESP_LOGI("uart_out", "(%d,%d,%d,%d)", uart_out.x, uart_out.y, uart_out.z, uart_out.colour);
+        }
+    }
 
     return httpd_resp_send(req, "OK", 2);
 }
@@ -135,6 +159,8 @@ extern "C" void app_main() {
         wifi_init();
         // vTaskDelay(pdMS_TO_TICKS(1500));
         start_mdns_service();
+        uart_driver_install(UART_NUM_2, uart_buffer_size, uart_buffer_size, 0, nullptr, 0);
+        uart_param_config(uart_num, &uart_config);
         server = start_webserver();
     }
 }

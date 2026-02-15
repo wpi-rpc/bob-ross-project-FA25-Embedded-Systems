@@ -1,8 +1,8 @@
 #include "edge_path_planning.hpp"
 
-std::vector<std::vector<cv::Point>> edge_path_coordinates(cv::Mat &image, const cv::Point offset) {
-    std::vector<std::vector<cv::Point>> path = {};
-    std::vector<cv::Point> streak = generate_edge_streak(image, offset);
+Path edge_path_coordinates(cv::Mat &image, const cv::Point offset) {
+    Path path = {};
+    Streak streak = generate_edge_streak(image, offset);
     // Keep going as long as drawing streak is present
     while (streak.size()) {
         // Ignore streaks that are too short
@@ -14,9 +14,9 @@ std::vector<std::vector<cv::Point>> edge_path_coordinates(cv::Mat &image, const 
     return interpolate(path);
 }
 
-std::vector<cv::Point> generate_edge_streak(cv::Mat &image, const cv::Point offset) {
-    std::vector<cv::Point> streak = {};
-    std::vector<cv::Point> queue = {};
+Streak generate_edge_streak(cv::Mat &image, const cv::Point offset) {
+    Streak streak = {};
+    Streak queue = {};
     // Find first white pixel in image
     bool stop = false;
     for (int i=0; i<image.rows; i++) {
@@ -41,7 +41,7 @@ std::vector<cv::Point> generate_edge_streak(cv::Mat &image, const cv::Point offs
             // Mark pixel as visited by colouring it gray
             image.at<uchar>(current) = 128;
             streak.push_back(current+offset);
-            std::vector<cv::Point> neighbours = get_neighbours(current, image);
+            Streak neighbours = get_neighbours(current, image);
             // Sort neighbours by number of white pixels surrounding them (smaller number of white pixels means it's more likely to be an edge)
             if (neighbours.size()>1) {
                 // Reverse because we want pixels with fewer white neighbours to be explored first
@@ -54,11 +54,11 @@ std::vector<cv::Point> generate_edge_streak(cv::Mat &image, const cv::Point offs
     return streak;
 }
 
-std::vector<std::vector<cv::Point>> interpolate(const std::vector<std::vector<cv::Point>> &path) {
-    std::vector<std::vector<cv::Point>> new_path = {};
+Path interpolate(const Path &path) {
+    Path new_path = {};
     
-    for (const std::vector<cv::Point> &streak : path) {
-        std::vector<cv::Point> new_streak = {};
+    for (const Streak &streak : path) {
+        Streak new_streak = {};
         cv::Point previous_point = streak[0];
         new_streak.push_back(previous_point);
         for (const cv::Point &point : streak) {
@@ -74,8 +74,8 @@ std::vector<std::vector<cv::Point>> interpolate(const std::vector<std::vector<cv
 }
 
 // Returns all white pixel neighbours of a given pixel
-std::vector<cv::Point> get_neighbours(const cv::Point pixel, const cv::Mat &image) {
-    std::vector<cv::Point> neighbours = {};
+Streak get_neighbours(const cv::Point pixel, const cv::Mat &image) {
+    Streak neighbours = {};
     int x=pixel.x, y=pixel.y;
     // Neighbours below pixel
     if (y) {
