@@ -28,8 +28,8 @@ static char *generate_hostname(void); // https://components.espressif.com/compon
 
 struct command {
     unsigned short x,y;
-    char z:2;
-    char colour:3;
+    uint8_t z;
+    uint8_t colour;
 };
 
 const int uart_buffer_size = 1024*2; // https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/uart.html
@@ -40,7 +40,7 @@ uart_config_t uart_config = {
     .data_bits = UART_DATA_8_BITS,
     .parity = UART_PARITY_DISABLE,
     .stop_bits = UART_STOP_BITS_1,
-    .flow_ctrl = UART_HW_FLOWCTRL_CTS_RTS,
+    .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
     .rx_flow_ctrl_thresh = 122,
 };
 
@@ -84,16 +84,37 @@ esp_err_t upload_post_handler(httpd_req_t* req) {
     cv::Canny(viewMN,viewMN,100,250);
     Path edge_path = edge_path_coordinates(viewMN, cv::Point(width_offset,height_offset)); // Process the image in-place
     command uart_out;
+    uart_out.colour = 0;
+    char uart_in = 0x15;
     for (int i=0; i<edge_path.size(); i++) {
         for (int j=0; j<edge_path[i].size(); j++) {
             uart_out.x = edge_path[i][j].x;
             uart_out.y = edge_path[i][j].y;
             uart_out.z = 2;
-            if (!j) uart_out.z = 1;
-            if (j==edge_path[i].size()-1) uart_out.z = 0;
-            uart_out.colour = 0;
+            if (!j) {
+                uart_out.z = 1;
+                if (j==edge_path[i].size()-1) {
+                    uart_write_bytes(uart_num, (const char*)&uart_out, sizeof(uart_out));
+                    ESP_LOGI("uart_out", "(%d,%d,%d,%d)", uart_out.x, uart_out.y, uart_out.z, uart_out.colour);
+                    uart_read_bytes(uart_num, &uart_in, 1, 100/portTICK_PERIOD_MS);
+                    if (uart_in!=0x06) {
+                        ESP_LOGE("uart_in", "Failure to acknowledge");
+                    } else {
+                        ESP_LOGI("uart_in", "Acknowledged");
+                    } uart_in = 0x15;
+                }
+            }
+            if (j==edge_path[i].size()-1) {
+                uart_out.z = 0;
+            }
             uart_write_bytes(uart_num, (const char*)&uart_out, sizeof(uart_out));
             ESP_LOGI("uart_out", "(%d,%d,%d,%d)", uart_out.x, uart_out.y, uart_out.z, uart_out.colour);
+            uart_read_bytes(uart_num, &uart_in, 1, 100/portTICK_PERIOD_MS);
+            if (uart_in!=0x06) {
+                ESP_LOGE("uart_in", "Failure to acknowledge");
+            } else {
+                ESP_LOGI("uart_in", "Acknowledged");
+            } uart_in = 0x15;
         }
     }
 
@@ -161,6 +182,7 @@ extern "C" void app_main() {
         start_mdns_service();
         uart_driver_install(UART_NUM_2, uart_buffer_size, uart_buffer_size, 0, nullptr, 0);
         uart_param_config(uart_num, &uart_config);
+        uart_set_pin(uart_num, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
         server = start_webserver();
     }
 }
