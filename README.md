@@ -13,7 +13,11 @@
 │   ├── favicon.ico
 │   ├── idf_component.yml
 │   ├── index.html
-│   └── main.cpp
+│   ├── main.cpp
+│   ├── network.cpp
+│   ├── network.hpp
+│   ├── server.cpp
+│   └── server.hpp
 ├── .clangd
 ├── .gitignore
 ├── CMakeLists.txt
@@ -37,6 +41,10 @@
     * [Web server AT examples](https://docs.espressif.com/projects/esp-at/en/latest/esp32/AT_Command_Examples/Web_server_AT_Examples.html)
     * [TCP-IP AT examples](https://docs.espressif.com/projects/esp-at/en/latest/esp32/AT_Command_Examples/TCP-IP_AT_Examples.html)
     * [Logging library](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/log.html)
+    * [HTTP server](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/protocols/esp_http_server.html)
+    * [Arduino as an ESP-IDF component](https://docs.espressif.com/projects/arduino-esp32/en/latest/esp-idf_component.html)
+    * [Serial (UART)](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/serial.html)
+    * [Universal asynchronous receiver/transmitter (UART)](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/uart.html)
 * OpenCV Resources
     * [`cv::Mat` class reference](https://docs.opencv.org/4.x/d3/d63/classcv_1_1Mat.html)
     * [`cv::String` class reference](https://docs.opencv.org/3.4/d1/d8f/classcv_1_1String.html)
