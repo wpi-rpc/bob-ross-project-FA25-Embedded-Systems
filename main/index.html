@@ -81,11 +81,13 @@
                                     for (j=0; j<SUBIMAGE_DIM; j++) {
                                         idx = canvas.width*(i+l*SUBIMAGE_DIM)+j+SUBIMAGE_DIM*p;
                                         
-                                        subimage[4*2+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
+                                        subimage[4*2+SUBIMAGE_DIM*i+j*3]=dataRGBA[4*idx];
+                                        subimage[4*2+SUBIMAGE_DIM*i+j*3+1]=dataRGBA[4*idx+1];
+                                        subimage[4*2+SUBIMAGE_DIM*i+j*3+2]=dataRGBA[4*idx+2];
                                         
-                                        imageBGW[4*idx]=subimage[4*2+SUBIMAGE_DIM*i+j];
-                                        imageBGW[4*idx+1]=imageBGW[4*idx];
-                                        imageBGW[4*idx+2]=imageBGW[4*idx];
+                                        imageBGW[4*idx]=dataRGBA[4*idx];
+                                        imageBGW[4*idx+1]=dataRGBA[4*idx+1];
+                                        imageBGW[4*idx+2]=dataRGBA[4*idx+2];
                                         imageBGW[4*idx+3]=255;
                                     }
                                 }
@@ -112,11 +114,13 @@
                                 for (j=0; j<canvas.width-SUBIMAGE_DIM*p; j++) {
                                     idx = canvas.width*(i+l*SUBIMAGE_DIM)+j+SUBIMAGE_DIM*p;
                                     
-                                    subimage[4*2+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
+                                    subimage[4*2+SUBIMAGE_DIM*i+j*3]=dataRGBA[4*idx];
+                                    subimage[4*2+SUBIMAGE_DIM*i+j*3+1]=dataRGBA[4*idx+1];
+                                    subimage[4*2+SUBIMAGE_DIM*i+j*3+2]=dataRGBA[4*idx+2];
                                     
-                                    imageBGW[4*idx]=subimage[4*2+SUBIMAGE_DIM*i+j];
-                                    imageBGW[4*idx+1]=imageBGW[4*idx];
-                                    imageBGW[4*idx+2]=imageBGW[4*idx];
+                                    imageBGW[4*idx]=dataRGBA[4*idx];
+                                    imageBGW[4*idx+1]=dataRGBA[4*idx+1];
+                                    imageBGW[4*idx+2]=dataRGBA[4*idx+2];
                                     imageBGW[4*idx+3]=255;
                                 }
                             }
@@ -142,11 +146,13 @@
                                 for (j=0; j<SUBIMAGE_DIM; j++) {
                                     idx = canvas.width*(i+l*SUBIMAGE_DIM)+j+SUBIMAGE_DIM*p;
                                     
-                                    subimage[4*2+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
+                                    subimage[4*2+SUBIMAGE_DIM*i+j*3]=dataRGBA[4*idx];
+                                    subimage[4*2+SUBIMAGE_DIM*i+j*3+1]=dataRGBA[4*idx+1];
+                                    subimage[4*2+SUBIMAGE_DIM*i+j*3+2]=dataRGBA[4*idx+2];
                                     
-                                    imageBGW[4*idx]=subimage[4*2+SUBIMAGE_DIM*i+j];
-                                    imageBGW[4*idx+1]=imageBGW[4*idx];
-                                    imageBGW[4*idx+2]=imageBGW[4*idx];
+                                    imageBGW[4*idx]=dataRGBA[4*idx];
+                                    imageBGW[4*idx+1]=dataRGBA[4*idx+1];
+                                    imageBGW[4*idx+2]=dataRGBA[4*idx+2];
                                     imageBGW[4*idx+3]=255;
                                 }
                             }
@@ -171,11 +177,13 @@
                             for (j=0; j<canvas.width-SUBIMAGE_DIM*p; j++) {
                                 idx = canvas.width*(i+l*SUBIMAGE_DIM)+j+SUBIMAGE_DIM*p;
                                 
-                                subimage[4*2+SUBIMAGE_DIM*i+j]=(19595 * dataRGBA[4*idx] + 38470 * dataRGBA[4*idx+1] + 7471 * dataRGBA[4*idx+2] + 32768) >> 16;
+                                subimage[4*2+SUBIMAGE_DIM*i+j*3]=dataRGBA[4*idx];
+                                subimage[4*2+SUBIMAGE_DIM*i+j*3+1]=dataRGBA[4*idx+1];
+                                subimage[4*2+SUBIMAGE_DIM*i+j*3+2]=dataRGBA[4*idx+2];
                                 
-                                imageBGW[4*idx]=subimage[4*2+SUBIMAGE_DIM*i+j];
-                                imageBGW[4*idx+1]=imageBGW[4*idx];
-                                imageBGW[4*idx+2]=imageBGW[4*idx];
+                                imageBGW[4*idx]=dataRGBA[4*idx];
+                                imageBGW[4*idx+1]=dataRGBA[4*idx+1];
+                                imageBGW[4*idx+2]=dataRGBA[4*idx+2];
                                 imageBGW[4*idx+3]=255;
                             }
                         }

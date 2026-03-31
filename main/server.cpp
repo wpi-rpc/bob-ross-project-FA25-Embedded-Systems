@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "edge_path_planning.hpp"
 #include "server.hpp"
+#include "color_path_planning.hpp"
 
 // Store uploaded image in RAM
 static char image_buffer[127*127];
@@ -58,9 +59,11 @@ esp_err_t upload_post_handler(httpd_req_t* req) {
     unsigned short height_offset = *(unsigned short*)height_offset_buffer;
 
     httpd_req_recv(req, image_buffer, width*height);
-    cv::Mat viewMN(height,width,CV_8UC1,image_buffer); // MxN-dimensional view of buffer
-    cv::Canny(viewMN,viewMN,100,250);
-    Path edge_path = edge_path_coordinates(viewMN, cv::Point(width_offset,height_offset)); // Process the image in-place
+    cv::Mat gray_image;
+    cv::Mat viewMN(height,width,CV_8UC3,image_buffer); // MxN-dimensional view of buffer
+    cv::cvtColor(viewMN, gray_image, cv::COLOR_BGR2GRAY);
+    cv::Canny(gray_image,gray_image,100,250);
+    Path edge_path = edge_path_coordinates(gray_image, cv::Point(width_offset,height_offset)); // Process the image in-place
     command uart_out;
     uart_out.colour = 0;
     char uart_in = 0x15;
@@ -96,6 +99,38 @@ esp_err_t upload_post_handler(httpd_req_t* req) {
         }
     }
 
+    ColorPath color_path = color_path_coordinates(gray_image, viewMN);
+    for (int i=0; i<color_path.size(); i++) {
+        // Send the start with pen up
+        uart_out.x = color_path[i].start.x;
+        uart_out.y = color_path[i].start.y;
+        uart_out.colour = color_path[i].color;
+        uart_out.z = 1;
+
+        uart_write_bytes(uart_num, (const char*)&uart_out, sizeof(uart_out));
+        ESP_LOGI("uart_out", "(%d,%d,%d,%d)", uart_out.x, uart_out.y, uart_out.z, uart_out.colour);
+        uart_read_bytes(uart_num, &uart_in, 1, 100/portTICK_PERIOD_MS);
+        if (uart_in!=0x06) {
+            ESP_LOGE("uart_in", "Failure to acknowledge");
+        } else {
+            ESP_LOGI("uart_in", "Acknowledged");
+        } uart_in = 0x15;
+        
+        // Send the end with pen down
+        uart_out.x = color_path[i].end.x;
+        uart_out.y = color_path[i].end.y;
+        uart_out.colour = color_path[i].color;
+        uart_out.z = 2;
+
+        uart_write_bytes(uart_num, (const char*)&uart_out, sizeof(uart_out));
+        ESP_LOGI("uart_out", "(%d,%d,%d,%d)", uart_out.x, uart_out.y, uart_out.z, uart_out.colour);
+        uart_read_bytes(uart_num, &uart_in, 1, 100/portTICK_PERIOD_MS);
+        if (uart_in!=0x06) {
+            ESP_LOGE("uart_in", "Failure to acknowledge");
+        } else {
+            ESP_LOGI("uart_in", "Acknowledged");
+        } uart_in = 0x15;
+    }
     return httpd_resp_send(req, "OK", 2);
 }
 
